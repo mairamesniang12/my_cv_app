@@ -1,5 +1,6 @@
 import streamlit as st
 import torch
+import base64
 import numpy as np
 from PIL import Image
 import os
@@ -11,7 +12,70 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+st.markdown("""
+<style>
+    /* Élargir le contenu principal */
+    .main .block-container {
+        max-width: 1400px;
+        padding-top: 2rem;
+        padding-left: 2rem;
+        padding-right: 2rem;
+    }
+    
+    /* Élargir la sidebar si nécessaire */
+    section[data-testid="stSidebar"] {
+        min-width: 300px;
+        width: 300px;
+    }
+    
+    /* Meilleure utilisation de l'espace */
+    .stMarkdown {
+        width: 100%;
+    }
+</style>
+""", unsafe_allow_html=True)
 
+ #BACKGROUND IMAGE WITH CSS
+def set_background(image_path):
+    try:
+        with open(image_path, "rb") as image_file:
+            encoded_string = base64.b64encode(image_file.read()).decode()
+        
+        st.markdown(
+            f"""
+            <style>
+            .stApp {{
+                background-color: #000000;
+                background-image: url(data:image/{"jpg" if image_path.endswith('.jpg') else "png"};base64,{encoded_string});
+                background-size: contain;
+                background-position: center;
+                background-repeat: no-repeat;
+                background-attachment: fixed;
+            }}
+            
+            /* Ajouter une légère transparence pour la lisibilité */
+            .stMarkdown, .stTitle, .stSubheader, .stText, .stSelectbox label {{
+                background-color: rgba(0, 0, 0, 0.6);
+                padding: 10px;
+                border-radius: 10px;
+                color: white !important;
+            }}
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+        return True
+    except:
+        return False
+
+
+col1, col2, col3 = st.columns([1, 3, 1])
+with col2:
+    try:
+        banner = Image.open("images/banner.jpg")
+        st.image(banner, width=600)  
+    except:
+        pass 
 
 # APP DESCRIPTION
 st.title("◈ Scene Classifier")
