@@ -1,1 +1,1 @@
-# my_cv_app
+# Scene Classifier
