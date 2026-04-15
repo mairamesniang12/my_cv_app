@@ -1,5 +1,6 @@
 streamlit
 torch
+tensorflow
 torchvision
 pillow
 numpy
