@@ -3,3 +3,5 @@ torch
 torchvision
 pillow
 numpy
+bs4
+pybase64
