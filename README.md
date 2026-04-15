@@ -68,10 +68,6 @@ Install:
 pip install -r requirements.txt
 ```
 
-For GPU support follow the official guides:
-- PyTorch  : https://pytorch.org/get-started/locally/
-- TensorFlow: https://www.tensorflow.org/install/pip
-
 ---
 
 ## Training
