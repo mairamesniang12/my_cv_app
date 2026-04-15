@@ -2,7 +2,7 @@ bs4
 pybase64
 streamlit
 torch
-tensorflow-cpu==2.15.0
+tensorflow
 torchvision
 pillow
 numpy
