@@ -65,7 +65,7 @@ with st.sidebar:
     **Scene Classifier** - Computer Vision Project
     
     - 🐍 Python 3.10
-    - 🔥 PyTorch
+    - 🔥 PyTorch / TensorFlow
     - 📊 Streamlit
     
     **Author:** Mairame Niang
@@ -75,8 +75,8 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 📊 Model Info")
     st.markdown("""
-    - **Framework:** PyTorch
-    - **Accuracy:** 90.47%
+    - **PyTorch:** 90.47% accuracy
+    - **TensorFlow:** ~90% accuracy
     - **Parameters:** 2.68M
     """)
 
@@ -99,46 +99,94 @@ os.makedirs(MODEL_DIR, exist_ok=True)
 IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
-# MODEL LOADING - PYTORCH ONLY
+# ============================================
+# PYTORCH MODEL
+# ============================================
 @st.cache_resource
-def load_model():
+def load_pytorch_model():
     from pytorch_model import IntelCNN_PyTorch
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = IntelCNN_PyTorch(num_classes=6).to(device)
     model_files = [f for f in os.listdir(MODEL_DIR) if f.endswith(".pth")]
     if not model_files:
-        st.error(f"No model found in {MODEL_DIR}")
-        st.stop()
+        return None, None
     model_path = os.path.join(MODEL_DIR, model_files[0])
     checkpoint = torch.load(model_path, map_location=device)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
     return model, device
 
-model, device = load_model()
-st.sidebar.success("✅ Model loaded successfully!")
+# ============================================
+# TENSORFLOW MODEL
+# ============================================
+@st.cache_resource
+def load_tensorflow_model():
+    try:
+        import tensorflow as tf
+        model_files = [f for f in os.listdir(MODEL_DIR) if f.endswith(".keras")]
+        if not model_files:
+            return None
+        model_path = os.path.join(MODEL_DIR, model_files[0])
+        model = tf.keras.models.load_model(model_path)
+        return model
+    except Exception as e:
+        st.warning(f"TensorFlow model could not be loaded: {e}")
+        return None
 
+# Load both models
+pt_model, pt_device = load_pytorch_model()
+tf_model = load_tensorflow_model()
+
+# Model selection
+model_choice = st.selectbox(
+    "Choose model",
+    ["pytorch", "tensorflow"],
+    help="Select backend framework"
+)
+
+if model_choice == "pytorch" and pt_model is None:
+    st.error("PyTorch model not found. Please train it first.")
+    st.stop()
+if model_choice == "tensorflow" and tf_model is None:
+    st.error("TensorFlow model not found. Please train it first.")
+    st.stop()
+
+st.sidebar.success(f"✅ {model_choice.upper()} model ready")
+
+# ============================================
 # PREPROCESSING
-def preprocess(image):
+# ============================================
+def preprocess_pytorch(image):
     img = image.resize((IMG_SIZE, IMG_SIZE))
     arr = np.array(img, dtype=np.float32) / 255.0
     arr = (arr - IMAGENET_MEAN) / IMAGENET_STD
     arr = arr.transpose(2, 0, 1)
-    return torch.tensor(arr, dtype=torch.float32).unsqueeze(0).to(device)
+    return torch.tensor(arr, dtype=torch.float32).unsqueeze(0).to(pt_device)
 
+def preprocess_tensorflow(image):
+    img = image.resize((IMG_SIZE, IMG_SIZE))
+    arr = np.array(img, dtype=np.float32) / 255.0
+    arr = (arr - IMAGENET_MEAN) / IMAGENET_STD
+    return np.expand_dims(arr, axis=0)
+
+# ============================================
 # PREDICTION
-def predict(image):
-    tensor = preprocess(image)
+# ============================================
+def predict_pytorch(image):
+    tensor = preprocess_pytorch(image)
     with torch.no_grad():
-        logits = model(tensor)
+        logits = pt_model(tensor)
         probs = torch.softmax(logits, dim=1).cpu().numpy()[0]
-    idx = int(np.argmax(probs))
-    cls = CLASSES[idx]
-    confidence = float(probs[idx]) * 100
-    top3 = [(CLASSES[i], probs[i] * 100) for i in np.argsort(probs)[::-1][:3]]
-    return cls, confidence, top3
+    return probs
 
+def predict_tensorflow(image):
+    tensor = preprocess_tensorflow(image)
+    probs = tf_model.predict(tensor, verbose=0)[0]
+    return probs
+
+# ============================================
 # UI
+# ============================================
 st.markdown("---")
 st.markdown("## 📤 Upload Image")
 
@@ -150,20 +198,34 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file).convert("RGB")
+    
     col1, col2 = st.columns([1, 1])
     with col1:
         st.image(image, caption="📷 Uploaded image", use_container_width=True)
+    
     with col2:
         if st.button("🔍 Predict", type="primary", use_container_width=True):
             with st.spinner("🧠 Analyzing..."):
-                cls, conf, top3 = predict(image)
+                if model_choice == "pytorch":
+                    probs = predict_pytorch(image)
+                else:
+                    probs = predict_tensorflow(image)
+            
+            idx = int(np.argmax(probs))
+            cls = CLASSES[idx]
+            confidence = float(probs[idx]) * 100
+            
+            top3 = [(CLASSES[i], probs[i] * 100) for i in np.argsort(probs)[::-1][:3]]
+            
             st.markdown("---")
             st.markdown("### 🎯 Main Result")
-            st.success(f"{CLASS_EMOJI[cls]} **{cls}** ({conf:.1f}% confidence)")
+            st.success(f"{CLASS_EMOJI[cls]} **{cls}** ({confidence:.1f}% confidence)")
+            
             st.markdown("### 📊 Top 3 Predictions")
             for c, p in top3:
                 st.progress(p/100, text=f"{CLASS_EMOJI[c]} {c}: {p:.1f}%")
+            
             st.balloons()
 
 st.markdown("---")
-st.caption("© 2024 Scene Classifier - Computer Vision Project | Accuracy: 90.47%")
+st.caption("© 2024 Scene Classifier - Computer Vision Project | PyTorch: 90.47% | TensorFlow: ~90%")
