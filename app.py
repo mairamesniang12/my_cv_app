@@ -35,7 +35,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# BACKGROUND IMAGE WITH CSS
+ #BACKGROUND IMAGE WITH CSS
 def set_background(image_path):
     try:
         with open(image_path, "rb") as image_file:
@@ -139,7 +139,7 @@ with st.sidebar:
     st.markdown("### 📁 Available Models")
     st.markdown("""
     - **PyTorch** : `.pth` (2.6M parameters)
-    - **TensorFlow** : `.h5` (2.6M parameters)
+    - **TensorFlow** : `.keras` (2.6M parameters)
     """)
 
 # CLASSES + EMOJIS
@@ -183,10 +183,9 @@ def load_pytorch_model(path):
     model.eval()
     return model, device
 
-# ✅ CORRECTION : chargement du modèle .h5 au lieu de .keras
 def load_tensorflow_model(path):
     import tensorflow as tf
-    return tf.keras.models.load_model(path, compile=False)
+    return tf.keras.models.load_model(path)
 
 def get_model(model_type):
     if model_type in _loaded_models:
@@ -195,8 +194,7 @@ def get_model(model_type):
     if model_type == "pytorch":
         candidates = [f for f in os.listdir(MODEL_DIR) if f.endswith(".pth")]
     else:
-        # ✅ CORRECTION : chercher .h5 au lieu de .keras
-        candidates = [f for f in os.listdir(MODEL_DIR) if f.endswith(".h5")]
+        candidates = [f for f in os.listdir(MODEL_DIR) if f.endswith(".keras")]
 
     if not candidates:
         st.error(f"No {model_type} model found in {MODEL_DIR}")
