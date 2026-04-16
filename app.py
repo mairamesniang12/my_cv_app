@@ -87,7 +87,7 @@ def get_model(model_type):
     if model_type == "pytorch":
         candidates = [f for f in os.listdir(MODEL_DIR) if f.endswith(".pth")]
     else:
-        candidates = [f for f in os.listdir(MODEL_DIR) if f.endswith(".h5")]  # ✅ FIX
+        candidates = [f for f in os.listdir(MODEL_DIR) if f.endswith(".keras")]  # ✅ FIX
 
     if not candidates:
         st.error(f"No {model_type} model found")
