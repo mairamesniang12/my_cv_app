@@ -185,7 +185,7 @@ def load_pytorch_model(path):
 
 def load_tensorflow_model(path):
     import tensorflow as tf
-    return tf.keras.models.load_model(path)
+    return tf.keras.models.load_model(path, compile=False)
 
 def get_model(model_type):
     if model_type in _loaded_models:
