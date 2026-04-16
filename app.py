@@ -5,6 +5,9 @@ from PIL import Image
 import os
 import base64
 
+# ============================================
+# CONFIG PAGE
+# ============================================
 st.set_page_config(
     page_title="Scene Classifier", 
     page_icon="◈",
@@ -12,7 +15,20 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# ============================================
+# STYLE
+# ============================================
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 2rem;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ============================================
 # BACKGROUND IMAGE
+# ============================================
 def set_background(image_path):
     try:
         with open(image_path, "rb") as image_file:
@@ -31,56 +47,52 @@ def set_background(image_path):
             """,
             unsafe_allow_html=True
         )
-        return True
     except:
-        return False
+        pass
 
-background_path = "images/banner.jpg"  
-if os.path.exists(background_path):
-    set_background(background_path)
+if os.path.exists("images/banner.jpg"):
+    set_background("images/banner.jpg")
 
+# ============================================
 # HEADER
+# ============================================
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
-    try:
+    if os.path.exists("images/banner.jpg"):
         banner = Image.open("images/banner.jpg")
         st.image(banner, width=500)
-    except:
+    else:
         st.title("◈ Scene Classifier")
 
-# MAIN CONTENT
+# ============================================
+# INTRO
+# ============================================
 st.markdown("""
 ### 🌍 Welcome to Scene Classifier!
 
 This application uses a **Convolutional Neural Network (CNN)** to automatically 
 recognize the type of landscape in your photos.
-
----
 """)
 
-# Sidebar
+# ============================================
+# SIDEBAR
+# ============================================
 with st.sidebar:
     st.markdown("### ◈ About")
     st.markdown("""
-    **Scene Classifier** - Computer Vision Project
+    **Scene Classifier**
     
-    - 🐍 Python 3.10
+    - 🐍 Python
     - 🔥 PyTorch / TensorFlow
     - 📊 Streamlit
     
     **Author:** Mairame Niang
-    
-    **Version:** 1.0.0
     """)
     st.markdown("---")
-    st.markdown("### 📊 Model Info")
-    st.markdown("""
-    - **PyTorch:** 90.47% accuracy
-    - **TensorFlow:** ~90% accuracy
-    - **Parameters:** 2.68M
-    """)
 
+# ============================================
 # CLASSES
+# ============================================
 CLASSES = ["Buildings", "Forest", "Glacier", "Mountain", "Sea", "Street"]
 CLASS_EMOJI = {
     "Buildings": "🏙️",
@@ -91,9 +103,11 @@ CLASS_EMOJI = {
     "Street": "🛣️",
 }
 
+# ============================================
 # CONFIG
+# ============================================
 IMG_SIZE = 150
-MODEL_DIR = os.path.join(os.path.dirname(__file__), "models")
+MODEL_DIR = "models"
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
@@ -107,13 +121,16 @@ def load_pytorch_model():
     from pytorch_model import IntelCNN_PyTorch
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = IntelCNN_PyTorch(num_classes=6).to(device)
+
     model_files = [f for f in os.listdir(MODEL_DIR) if f.endswith(".pth")]
     if not model_files:
         return None, None
+
     model_path = os.path.join(MODEL_DIR, model_files[0])
     checkpoint = torch.load(model_path, map_location=device)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
+
     return model, device
 
 # ============================================
@@ -123,35 +140,43 @@ def load_pytorch_model():
 def load_tensorflow_model():
     try:
         import tensorflow as tf
+        tf.get_logger().setLevel('ERROR')
+
         model_files = [f for f in os.listdir(MODEL_DIR) if f.endswith(".keras")]
         if not model_files:
             return None
+
         model_path = os.path.join(MODEL_DIR, model_files[0])
-        model = tf.keras.models.load_model(model_path)
+        model = tf.keras.models.load_model(model_path, compile=False)
         return model
+
     except Exception as e:
-        st.warning(f"TensorFlow model could not be loaded: {e}")
+        st.warning(f"TensorFlow model error: {e}")
         return None
 
-# Load both models
+# ============================================
+# LOAD MODELS
+# ============================================
 pt_model, pt_device = load_pytorch_model()
 tf_model = load_tensorflow_model()
 
-# Model selection
+# ============================================
+# MODEL CHOICE
+# ============================================
 model_choice = st.selectbox(
     "Choose model",
-    ["pytorch", "tensorflow"],
-    help="Select backend framework"
+    ["pytorch", "tensorflow"]
 )
 
 if model_choice == "pytorch" and pt_model is None:
-    st.error("PyTorch model not found. Please train it first.")
-    st.stop()
-if model_choice == "tensorflow" and tf_model is None:
-    st.error("TensorFlow model not found. Please train it first.")
+    st.error("PyTorch model not found.")
     st.stop()
 
-st.sidebar.success(f"✅ {model_choice.upper()} model ready")
+if model_choice == "tensorflow" and tf_model is None:
+    st.error("TensorFlow model not found.")
+    st.stop()
+
+st.sidebar.success(f"{model_choice.upper()} model ready")
 
 # ============================================
 # PREPROCESSING
@@ -161,7 +186,7 @@ def preprocess_pytorch(image):
     arr = np.array(img, dtype=np.float32) / 255.0
     arr = (arr - IMAGENET_MEAN) / IMAGENET_STD
     arr = arr.transpose(2, 0, 1)
-    return torch.tensor(arr, dtype=torch.float32).unsqueeze(0).to(pt_device)
+    return torch.tensor(arr).unsqueeze(0).to(pt_device)
 
 def preprocess_tensorflow(image):
     img = image.resize((IMG_SIZE, IMG_SIZE))
@@ -192,40 +217,52 @@ st.markdown("## 📤 Upload Image")
 
 uploaded_file = st.file_uploader(
     "Choose an image",
-    type=["jpg", "png", "jpeg"],
-    help="Accepted formats: JPG, PNG, JPEG"
+    type=["jpg", "png", "jpeg"]
 )
 
-if uploaded_file is not None:
+if uploaded_file:
     image = Image.open(uploaded_file).convert("RGB")
-    
-    col1, col2 = st.columns([1, 1])
+
+    col1, col2 = st.columns(2)
+
     with col1:
-        st.image(image, caption="📷 Uploaded image", use_container_width=True)
-    
+        st.image(image, caption="Uploaded image", use_container_width=True)
+
     with col2:
-        if st.button("🔍 Predict", type="primary", use_container_width=True):
-            with st.spinner("🧠 Analyzing..."):
+        if st.button("🔍 Predict"):
+            with st.spinner("Analyzing..."):
                 if model_choice == "pytorch":
                     probs = predict_pytorch(image)
                 else:
                     probs = predict_tensorflow(image)
-            
+
             idx = int(np.argmax(probs))
             cls = CLASSES[idx]
             confidence = float(probs[idx]) * 100
-            
+
             top3 = [(CLASSES[i], probs[i] * 100) for i in np.argsort(probs)[::-1][:3]]
-            
-            st.markdown("---")
-            st.markdown("### 🎯 Main Result")
-            st.success(f"{CLASS_EMOJI[cls]} **{cls}** ({confidence:.1f}% confidence)")
-            
+
+            st.markdown("### 🎯 Result")
+            st.success(f"{CLASS_EMOJI[cls]} {cls} — {confidence:.1f}%")
+
             st.markdown("### 📊 Top 3 Predictions")
             for c, p in top3:
-                st.progress(p/100, text=f"{CLASS_EMOJI[c]} {c}: {p:.1f}%")
-            
+                st.write(f"{CLASS_EMOJI[c]} {c} — {p:.1f}%")
+                st.progress(float(p) / 100)
+
+            # Interpretation
+            st.markdown("### 🧠 Confidence Level")
+            if confidence > 85:
+                st.success("High confidence")
+            elif confidence > 60:
+                st.warning("Moderate confidence")
+            else:
+                st.error("Low confidence")
+
             st.balloons()
 
+# ============================================
+# FOOTER
+# ============================================
 st.markdown("---")
-st.caption("© 2024 Scene Classifier - Computer Vision Project | PyTorch: 90.47% | TensorFlow: ~90%")
+st.caption("© Scene Classifier - Computer Vision Project")
